@@ -7,7 +7,11 @@ import { ArrowLeft, Droplets, CheckCircle } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
 const isDonorUser = (user) =>
-  user && (user.isDonor === true || user.isDonor === "true");
+  user &&
+  (user.isDonor === true ||
+    user.isDonor === "true" ||
+    user.isDonor === 1 ||
+    user.isDonor === "1");
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -87,7 +91,10 @@ export default function RequestBlood() {
         .filter(
           ([, user]) =>
             isDonorUser(user) &&
-            (user.available === true || user.available === "true") &&
+            (user.available === true ||
+              user.available === "true" ||
+              user.available === 1 ||
+              user.available === "1") &&
             user.bloodGroup === bloodGroup
         )
         .map(([donorId]) => donorId);

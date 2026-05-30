@@ -6,10 +6,18 @@ import { Search, MapPin, Phone, User } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
 const isDonorUser = (donor) =>
-  donor && (donor.isDonor === true || donor.isDonor === "true");
+  donor &&
+  (donor.isDonor === true ||
+    donor.isDonor === "true" ||
+    donor.isDonor === 1 ||
+    donor.isDonor === "1");
 
 const isAvailableDonor = (donor) =>
-  donor && (donor.available === true || donor.available === "true");
+  donor &&
+  (donor.available === true ||
+    donor.available === "true" ||
+    donor.available === 1 ||
+    donor.available === "1");
 
 const bloodGroups = ["All", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 

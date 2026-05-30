@@ -7,7 +7,11 @@ import { Droplets, AlertCircle, Search, ClipboardList, Heart, Bell } from "lucid
 import BottomNav from "../components/BottomNav";
 
 const isDonorUser = (user) =>
-  user && (user.isDonor === true || user.isDonor === "true");
+  user &&
+  (user.isDonor === true ||
+    user.isDonor === "true" ||
+    user.isDonor === 1 ||
+    user.isDonor === "1");
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
