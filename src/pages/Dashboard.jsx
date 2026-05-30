@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, update, push } from "firebase/database";
 import { Droplets, AlertCircle, Search, ClipboardList, Heart, Bell } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
@@ -15,6 +15,9 @@ export default function Dashboard() {
   const [emergenciesCount, setEmergenciesCount] = useState(0);
   const [donorsCount, setDonorsCount] = useState(0);
   const [recentRequests, setRecentRequests] = useState([]);
+  const [availableRequests, setAvailableRequests] = useState([]);
+  const [acceptingRequestId, setAcceptingRequestId] = useState(null);
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -111,6 +114,82 @@ export default function Dashboard() {
       unsubscribeDonors();
     };
   }, [currentUser, navigate]);
+
+  useEffect(() => {
+    if (!currentUser || !userProfile?.isDonor) {
+      setAvailableRequests([]);
+      return;
+    }
+
+    const requestsRef = ref(db, "requests");
+    const unsubscribeAvailable = onValue(
+      requestsRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+          setAvailableRequests([]);
+          return;
+        }
+
+        const allPending = Object.entries(data)
+          .filter(
+            ([, request]) =>
+              request &&
+              request.status === "pending" &&
+              request.userId !== currentUser.uid
+          )
+          .map(([id, request]) => ({ id, ...request }));
+
+        const matchingRequests = allPending.filter((request) => {
+          const bloodMatch = userProfile.bloodGroup
+            ? request.bloodGroup === userProfile.bloodGroup
+            : true;
+          const cityMatch = userProfile.city
+            ? request.city?.toLowerCase() === userProfile.city?.toLowerCase()
+            : true;
+          return bloodMatch && cityMatch;
+        });
+
+        setAvailableRequests(matchingRequests);
+      },
+      (err) => {
+        console.error("Error fetching donor requests:", err);
+        setAvailableRequests([]);
+      }
+    );
+
+    return () => unsubscribeAvailable();
+  }, [currentUser, userProfile]);
+
+  async function handleAcceptRequest(request) {
+    if (!currentUser) {
+      return;
+    }
+
+    setAcceptingRequestId(request.id);
+    setActionError("");
+
+    try {
+      await update(ref(db, "requests/" + request.id), {
+        status: "accepted",
+        donorId: currentUser.uid,
+        updatedAt: Date.now(),
+      });
+
+      await push(ref(db, "notifications/" + request.userId), {
+        type: "success",
+        title: "Blood Request Accepted",
+        message: `A donor accepted your request for ${request.patientName || "blood"}.`,
+        read: false,
+        createdAt: Date.now(),
+      });
+    } catch (err) {
+      console.error("Accept request error:", err);
+      setActionError("Unable to accept the request right now. Please try again.");
+    } finally {
+      setAcceptingRequestId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -213,6 +292,61 @@ export default function Dashboard() {
             </p>
           </button>
         </div>
+
+        {userProfile?.isDonor && (
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Available Requests</h2>
+                <p className="text-gray-500 text-xs">
+                  Pending blood requests matching your profile
+                </p>
+              </div>
+              <span className="text-xs text-gray-500">
+                Blood group {userProfile.bloodGroup || "any"}
+              </span>
+            </div>
+
+            {actionError && (
+              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
+
+            {availableRequests.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
+                No pending requests currently match your profile.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {availableRequests.map((request) => (
+                  <div key={request.id} className="rounded-2xl border border-gray-100 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {request.patientName || "Blood needed"}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {request.bloodGroup} • {request.units} unit(s)
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {request.hospital}, {request.city}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleAcceptRequest(request)}
+                        disabled={acceptingRequestId === request.id}
+                        className="rounded-2xl bg-red-600 px-4 py-2 text-xs text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {acceptingRequestId === request.id ? "Accepting..." : "Accept"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {recentRequests.length > 0 && (
           <div className="mb-4">

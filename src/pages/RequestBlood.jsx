@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
-import { ref, push } from "firebase/database";
+import { ref, push, get } from "firebase/database";
 import { ArrowLeft, Droplets, CheckCircle } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
@@ -54,6 +54,7 @@ export default function RequestBlood() {
         status: "pending",
         createdAt: Date.now(),
       });
+      await notifyMatchingDonors(bloodGroup, hospital, city, units);
       setSuccess(true);
       setForm({
         patientName: "",
@@ -69,6 +70,39 @@ export default function RequestBlood() {
       setError("Failed to submit request. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function notifyMatchingDonors(bloodGroup, hospital, city, units) {
+    try {
+      const usersSnapshot = await get(ref(db, "users"));
+      const usersData = usersSnapshot.val();
+      if (!usersData) {
+        return;
+      }
+      const matchingDonorIds = Object.entries(usersData)
+        .filter(
+          ([, user]) =>
+            user &&
+            user.isDonor === true &&
+            user.available === true &&
+            user.bloodGroup === bloodGroup
+        )
+        .map(([donorId]) => donorId);
+
+      await Promise.all(
+        matchingDonorIds.map((donorId) =>
+          push(ref(db, `notifications/${donorId}`), {
+            type: "request",
+            title: "New Blood Request",
+            message: `Need ${units} unit(s) of ${bloodGroup} at ${hospital} in ${city}`,
+            read: false,
+            createdAt: Date.now(),
+          })
+        )
+      );
+    } catch (err) {
+      console.error("Request notification error:", err);
     }
   }
 
