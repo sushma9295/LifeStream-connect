@@ -1,8 +1,8 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
-import { ref, push } from "firebase/database";
+import { ref, onValue, push } from "firebase/database";
 import { AlertCircle, ArrowLeft, CheckCircle } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
@@ -20,7 +20,7 @@ export default function EmergencyRequest() {
   const [hospital, setHospital] = useState("");
   const [units, setUnits] = useState("1");
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -30,30 +30,83 @@ export default function EmergencyRequest() {
       setError("Please log in to broadcast an emergency.");
       return;
     }
+
     if (!selectedGroup || !city || !hospital) {
       setError("Please fill all fields and select a blood group.");
       return;
     }
+
+    setLoading(true);
+    setError("");
+    setSuccessMessage("");
+
     try {
-      setError("");
-      setLoading(true);
-      await push(ref(db, "emergency"), {
+      const emergencyData = {
         bloodGroup: selectedGroup,
-        city,
-        hospital,
-        units,
-        urgency,
+        city: city,
+        hospital: hospital,
+        units: units,
+        urgency: urgency,
         userId: currentUser.uid,
         status: "active",
         createdAt: Date.now(),
+      };
+
+      await push(ref(db, "emergency"), emergencyData);
+
+      const usersSnapshot = await new Promise((resolve, reject) => {
+        const usersRef = ref(db, "users");
+        const unsubscribeUsers = onValue(
+          usersRef,
+          (snapshot) => {
+            unsubscribeUsers();
+            resolve(snapshot);
+          },
+          (err) => {
+            unsubscribeUsers();
+            reject(err);
+          }
+        );
       });
-      setSent(true);
+
+      const usersData = usersSnapshot.val();
+      const donorEntries = usersData
+        ? Object.entries(usersData).filter(
+            ([, user]) => user && user.isDonor === true
+          )
+        : [];
+
+      const notificationPromises = donorEntries.map(([userId]) =>
+        push(ref(db, "notifications/" + userId), {
+          type: "alert",
+          title: "EMERGENCY: Blood Needed!",
+          message:
+            urgency +
+            " - " +
+            selectedGroup +
+            " needed at " +
+            hospital +
+            " in " +
+            city,
+          read: false,
+          createdAt: Date.now(),
+        })
+      );
+
+      if (notificationPromises.length > 0) {
+        await Promise.all(notificationPromises);
+      }
+
+      setSuccessMessage(
+        "Emergency broadcasted to " + notificationPromises.length + " donors!"
+      );
       setSelectedGroup("");
+      setUrgency("Critical");
       setCity("");
       setHospital("");
       setUnits("1");
-      setTimeout(() => setSent(false), 5000);
-    } catch {
+    } catch (err) {
+      console.error("Emergency broadcast error:", err);
       setError("Failed to broadcast. Please try again.");
     } finally {
       setLoading(false);
@@ -62,7 +115,6 @@ export default function EmergencyRequest() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
       <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 pt-12 pb-6">
         <button
           onClick={() => navigate(-1)}
@@ -85,29 +137,26 @@ export default function EmergencyRequest() {
       </div>
 
       <div className="px-4 py-6 space-y-4">
-        {/* Success Banner */}
-        {sent && (
+        {successMessage && (
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
             <CheckCircle className="text-green-500" size={22} />
             <div>
               <p className="text-green-700 font-semibold text-sm">
-                Emergency Broadcasted!
+                {successMessage}
               </p>
               <p className="text-green-600 text-xs">
-                Nearby donors have been notified.
+                All donors have been notified in real time.
               </p>
             </div>
           </div>
         )}
 
-        {/* Error Banner */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <p className="text-red-600 text-sm">{error}</p>
           </div>
         )}
 
-        {/* Blood Group Selector */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-3">
             Select Blood Group *
@@ -130,7 +179,6 @@ export default function EmergencyRequest() {
           </div>
         </div>
 
-        {/* Urgency Selector */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-sm font-semibold text-gray-700 mb-3">
             Urgency Level
@@ -142,7 +190,9 @@ export default function EmergencyRequest() {
                 onClick={() => setUrgency(label)}
                 className={
                   "flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all " +
-                  (urgency === label ? style : "bg-gray-50 text-gray-500 border-gray-200")
+                  (urgency === label
+                    ? style
+                    : "bg-gray-50 text-gray-500 border-gray-200")
                 }
               >
                 {label}
@@ -151,7 +201,6 @@ export default function EmergencyRequest() {
           </div>
         </div>
 
-        {/* Form Fields */}
         <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">
@@ -192,7 +241,6 @@ export default function EmergencyRequest() {
           </div>
         </div>
 
-        {/* Broadcast Button */}
         <button
           onClick={handleBroadcast}
           disabled={loading}

@@ -28,7 +28,9 @@ export default function Profile() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const firstName = userProfile?.name ? userProfile.name.split(" ")[0] : currentUser?.email?.split("@")[0] || "User";
+  const firstName = userProfile?.name
+    ? userProfile.name.split(" ")[0]
+    : currentUser?.email?.split("@")[0] || "User";
   const firstLetter = firstName && firstName.length > 0 ? firstName[0].toUpperCase() : "U";
 
   useEffect(() => {
@@ -45,16 +47,14 @@ export default function Profile() {
       userRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          setUserProfile(data);
-          setAvailable(data.available || false);
-          setEditForm({
-            name: data.name || "",
-            phone: data.phone || "",
-            city: data.city || "",
-            bloodGroup: data.bloodGroup || "",
-          });
-        }
+        setUserProfile(data || null);
+        setAvailable(data?.available || false);
+        setEditForm({
+          name: data?.name || "",
+          phone: data?.phone || "",
+          city: data?.city || "",
+          bloodGroup: data?.bloodGroup || "",
+        });
       },
       (err) => {
         console.error("Error fetching user profile:", err);
@@ -68,7 +68,7 @@ export default function Profile() {
       (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          const userRequests = Object.values(data).filter((req) => req.userId === currentUser.uid);
+          const userRequests = Object.values(data).filter((req) => req && req.userId === currentUser.uid);
           setRequestsCount(userRequests.length);
         } else {
           setRequestsCount(0);
@@ -88,7 +88,7 @@ export default function Profile() {
         const data = snapshot.val();
         if (data) {
           const donations = Object.values(data).filter(
-            (req) => req.donorId === currentUser.uid && req.status === "completed"
+            (req) => req && req.donorId === currentUser.uid && req.status === "completed"
           );
           setDonationsCount(donations.length);
         } else {

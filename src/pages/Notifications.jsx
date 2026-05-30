@@ -4,7 +4,6 @@ import { db } from "../firebase/config";
 import { ref, onValue, update, remove } from "firebase/database";
 import { Bell } from "lucide-react";
 import BottomNav from "../components/BottomNav";
-import { onForegroundMessage } from "../firebase/messaging"
 
 export default function Notifications() {
   const { currentUser } = useAuth();
@@ -14,6 +13,8 @@ export default function Notifications() {
 
   useEffect(() => {
     if (!currentUser) {
+      setNotifications([]);
+      setLoading(false);
       return;
     }
 
@@ -47,35 +48,16 @@ export default function Notifications() {
     };
   }, [currentUser]);
 
-  useEffect(() => {
-    let unsubscribe = null
-    try {
-      unsubscribe = onForegroundMessage((payload) => {
-        const newNotif = {
-          id: Date.now().toString(),
-          type: payload.data && payload.data.type ? payload.data.type : "alert",
-          title: payload.notification && payload.notification.title ? payload.notification.title : "New Alert",
-          message: payload.notification && payload.notification.body ? payload.notification.body : "New notification",
-          time: "Just now",
-          read: false
-        }
-        setNotifications((prev) => [newNotif, ...prev])
-      })
-    } catch (err) {
-      console.log("Message handler error:", err)
+  async function handleMarkAsRead(notificationId, read) {
+    if (!currentUser || read) {
+      return;
     }
-    return () => {
-      if (unsubscribe && typeof unsubscribe === "function") {
-        unsubscribe()
-      }
-    }
-  }, [])
 
-  async function handleMarkAsRead(notificationId) {
     try {
-      await update(ref(db, "notifications/" + currentUser.uid + "/" + notificationId), {
-        read: true,
-      });
+      await update(
+        ref(db, "notifications/" + currentUser.uid + "/" + notificationId),
+        { read: true }
+      );
       setNotifications((prev) =>
         prev.map((item) =>
           item.id === notificationId ? { ...item, read: true } : item
@@ -88,6 +70,10 @@ export default function Notifications() {
   }
 
   async function handleDeleteNotification(notificationId) {
+    if (!currentUser) {
+      return;
+    }
+
     try {
       await remove(ref(db, "notifications/" + currentUser.uid + "/" + notificationId));
     } catch (err) {
@@ -97,6 +83,10 @@ export default function Notifications() {
   }
 
   async function handleMarkAllAsRead() {
+    if (!currentUser) {
+      return;
+    }
+
     const updates = {};
     notifications.forEach((notification) => {
       if (!notification.read) {
@@ -171,6 +161,7 @@ export default function Notifications() {
                 <div
                   key={notification.id}
                   className={"rounded-2xl p-4 shadow-sm " + getNotificationBorder(notification.type) + " " + bgClass}
+                  onClick={() => handleMarkAsRead(notification.id, notification.read)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
@@ -183,14 +174,20 @@ export default function Notifications() {
                     <div className="flex flex-col items-end gap-2">
                       {!notification.read && (
                         <button
-                          onClick={() => handleMarkAsRead(notification.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleMarkAsRead(notification.id, notification.read);
+                          }}
                           className="text-red-600 text-xs font-semibold"
                         >
                           Mark read
                         </button>
                       )}
                       <button
-                        onClick={() => handleDeleteNotification(notification.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteNotification(notification.id);
+                        }}
                         className="text-gray-500 text-xs font-semibold"
                       >
                         Delete

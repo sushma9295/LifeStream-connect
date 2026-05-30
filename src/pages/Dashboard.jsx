@@ -1,11 +1,10 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
 import { ref, onValue } from "firebase/database";
 import { Droplets, AlertCircle, Search, ClipboardList, Heart, Bell } from "lucide-react";
 import BottomNav from "../components/BottomNav";
-import { requestNotificationPermission } from "../firebase/messaging"
 
 export default function Dashboard() {
   const { currentUser } = useAuth();
@@ -33,74 +32,75 @@ export default function Dashboard() {
     setError(null);
 
     const userRef = ref(db, "users/" + currentUser.uid);
+    const requestsRef = ref(db, "requests");
+    const emergenciesRef = ref(db, "emergency");
+    const usersRef = ref(db, "users");
+
     const unsubscribeUser = onValue(
       userRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          setUserProfile(data);
-        }
+        setUserProfile(data || null);
       },
       (err) => {
         console.error("Error fetching user profile:", err);
+        setError("Unable to load profile data.");
       }
     );
 
-    const requestsRef = ref(db, "requests");
     const unsubscribeRequests = onValue(
       requestsRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          const userRequests = Object.entries(data).filter(([, req]) => req.userId === currentUser.uid);
-          setRequestsCount(userRequests.length);
-          const recent = userRequests
-            .slice(0, 3)
-            .map(([id, req]) => ({ id, ...req }));
-          setRecentRequests(recent);
-        } else {
-          setRequestsCount(0);
-          setRecentRequests([]);
-        }
+        const userRequests = data
+          ? Object.entries(data)
+              .filter(([, req]) => req && req.userId === currentUser.uid)
+              .map(([id, req]) => ({ id, ...req }))
+          : [];
+        setRequestsCount(userRequests.length);
+        const sortedRecent = userRequests
+          .slice()
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+          .slice(0, 3);
+        setRecentRequests(sortedRecent);
         setLoading(false);
       },
       (err) => {
         console.error("Error fetching requests:", err);
+        setError("Unable to load requests.");
+        setRequestsCount(0);
+        setRecentRequests([]);
         setLoading(false);
       }
     );
 
-    const emergenciesRef = ref(db, "emergency");
     const unsubscribeEmergencies = onValue(
       emergenciesRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          const active = Object.values(data).filter((em) => em.status === "active");
-          setEmergenciesCount(active.length);
-        } else {
-          setEmergenciesCount(0);
-        }
+        const activeCount = data
+          ? Object.values(data).filter((emergency) => emergency && emergency.status === "active").length
+          : 0;
+        setEmergenciesCount(activeCount);
       },
       (err) => {
         console.error("Error fetching emergencies:", err);
+        setEmergenciesCount(0);
       }
     );
 
-    const usersRef = ref(db, "users");
     const unsubscribeDonors = onValue(
       usersRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          const donors = Object.values(data).filter((user) => user.isDonor === true);
-          setDonorsCount(donors.length);
-        } else {
-          setDonorsCount(0);
-        }
+        const donorCount = data
+          ? Object.values(data).filter((user) => user && user.isDonor === true).length
+          : 0;
+        setDonorsCount(donorCount);
       },
       (err) => {
         console.error("Error fetching donors:", err);
+        setDonorsCount(0);
       }
     );
 
@@ -111,18 +111,6 @@ export default function Dashboard() {
       unsubscribeDonors();
     };
   }, [currentUser, navigate]);
-
-  useEffect(() => {
-    if (currentUser) {
-      setTimeout(() => {
-        requestNotificationPermission(currentUser.uid)
-          .then((token) => {
-            if (token) console.log("Push notifications enabled")
-          })
-          .catch((err) => console.log("Notification setup:", err))
-      }, 2000)
-    }
-  }, [currentUser])
 
   if (loading) {
     return (
@@ -247,8 +235,8 @@ export default function Dashboard() {
                         (req.status === "completed"
                           ? "bg-green-100 text-green-700"
                           : req.status === "accepted"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-yellow-100 text-yellow-700")
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-yellow-100 text-yellow-700")
                       }
                     >
                       {req.status}

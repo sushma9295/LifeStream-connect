@@ -16,12 +16,14 @@ export default function FindDonor() {
   const { currentUser } = useAuth();
 
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
     setLoading(true);
     setError("");
+
+    if (!currentUser) {
+      setDonors([]);
+      setLoading(false);
+      return;
+    }
 
     const donorsRef = ref(db, "users");
     const unsubscribeDonors = onValue(
@@ -30,8 +32,8 @@ export default function FindDonor() {
         const data = snapshot.val();
         if (data) {
           const realDonors = Object.entries(data)
-            .map(([id, donor]) => ({ id, ...donor }))
-            .filter((d) => d.isDonor === true && d.available === true);
+            .filter(([, donor]) => donor && donor.isDonor === true)
+            .map(([id, donor]) => ({ id, ...donor }));
           setDonors(realDonors);
         } else {
           setDonors([]);
@@ -41,6 +43,7 @@ export default function FindDonor() {
       (err) => {
         console.error("Error fetching donors:", err);
         setError("Unable to load donors. Please try again.");
+        setDonors([]);
         setLoading(false);
       }
     );
@@ -115,7 +118,7 @@ export default function FindDonor() {
           <div className="text-center py-12">
             <User className="mx-auto text-gray-300 mb-3" size={48} />
             <p className="text-gray-500 font-medium">No donors registered yet</p>
-            <p className="text-gray-400 text-sm mt-1">Be the first donor!</p>
+            <p className="text-gray-400 text-sm mt-1">Sign up as a donor to appear here</p>
           </div>
         )}
 
@@ -140,13 +143,19 @@ export default function FindDonor() {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <p className="font-semibold text-gray-800 text-sm truncate">
                       {donor.name || "Anonymous"}
                     </p>
-                    <span className="flex items-center gap-1 text-xs font-medium text-green-600">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                      Available
+                    <span
+                      className={
+                        "text-xs font-medium px-3 py-1 rounded-full " +
+                        (donor.available
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600")
+                      }
+                    >
+                      {donor.available ? "Available" : "Unavailable"}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">

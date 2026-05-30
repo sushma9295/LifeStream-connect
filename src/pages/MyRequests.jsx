@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
@@ -33,7 +33,7 @@ export default function MyRequests() {
         const data = snapshot.val();
         if (data) {
           const userRequests = Object.entries(data)
-            .filter(([, req]) => req.userId === currentUser.uid)
+            .filter(([, req]) => req && req.userId === currentUser.uid)
             .map(([id, req]) => ({ id, ...req }));
           setRequests(userRequests);
         } else {
@@ -201,7 +201,7 @@ export default function MyRequests() {
                 </div>
 
                 <div className="flex gap-2 mt-4">
-                  {["accepted", "in-progress"].includes(item.status) && (
+                  {(["accepted", "in-progress"].includes(item.status)) && (
                     <button
                       onClick={() =>
                         navigate("/live-tracking", {
