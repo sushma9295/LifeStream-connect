@@ -6,6 +6,9 @@ import { ref, onValue, update, push } from "firebase/database";
 import { Droplets, AlertCircle, Search, ClipboardList, Heart, Bell } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
+const isDonorUser = (user) =>
+  user && (user.isDonor === true || user.isDonor === "true");
+
 export default function Dashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -97,7 +100,7 @@ export default function Dashboard() {
       (snapshot) => {
         const data = snapshot.val();
         const donorCount = data
-          ? Object.values(data).filter((user) => user && user.isDonor === true).length
+          ? Object.values(data).filter((user) => isDonorUser(user)).length
           : 0;
         setDonorsCount(donorCount);
       },
@@ -116,7 +119,7 @@ export default function Dashboard() {
   }, [currentUser, navigate]);
 
   useEffect(() => {
-    if (!currentUser || !userProfile?.isDonor) {
+    if (!currentUser || !isDonorUser(userProfile)) {
       setAvailableRequests([]);
       return;
     }

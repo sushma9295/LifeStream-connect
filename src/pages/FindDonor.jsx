@@ -5,6 +5,12 @@ import { ref, onValue } from "firebase/database";
 import { Search, MapPin, Phone, User } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
+const isDonorUser = (donor) =>
+  donor && (donor.isDonor === true || donor.isDonor === "true");
+
+const isAvailableDonor = (donor) =>
+  donor && (donor.available === true || donor.available === "true");
+
 const bloodGroups = ["All", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function FindDonor() {
@@ -32,7 +38,7 @@ export default function FindDonor() {
         const data = snapshot.val();
         if (data) {
           const realDonors = Object.entries(data)
-            .filter(([, donor]) => donor && donor.isDonor === true)
+            .filter(([, donor]) => isDonorUser(donor))
             .map(([id, donor]) => ({ id, ...donor }));
           setDonors(realDonors);
         } else {

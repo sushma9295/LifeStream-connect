@@ -6,6 +6,9 @@ import { ref, push, get } from "firebase/database";
 import { ArrowLeft, Droplets, CheckCircle } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
+const isDonorUser = (user) =>
+  user && (user.isDonor === true || user.isDonor === "true");
+
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function RequestBlood() {
@@ -83,9 +86,8 @@ export default function RequestBlood() {
       const matchingDonorIds = Object.entries(usersData)
         .filter(
           ([, user]) =>
-            user &&
-            user.isDonor === true &&
-            user.available === true &&
+            isDonorUser(user) &&
+            (user.available === true || user.available === "true") &&
             user.bloodGroup === bloodGroup
         )
         .map(([donorId]) => donorId);

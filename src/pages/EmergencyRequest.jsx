@@ -72,7 +72,7 @@ export default function EmergencyRequest() {
       const usersData = usersSnapshot.val();
       const donorEntries = usersData
         ? Object.entries(usersData).filter(
-            ([, user]) => user && user.isDonor === true
+            ([, user]) => user && (user.isDonor === true || user.isDonor === "true")
           )
         : [];
 
