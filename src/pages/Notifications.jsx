@@ -1,125 +1,83 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { Bell, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
 import { ref, onValue, update, remove } from "firebase/database";
-import { Bell } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 
 export default function Notifications() {
   const { currentUser } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!currentUser) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
+    if (!currentUser) return;
 
-    setLoading(true);
-    setError("");
-
-    const notificationsRef = ref(db, "notifications/" + currentUser.uid);
-    const unsubscribeNotifications = onValue(
-      notificationsRef,
-      (snapshot) => {
+    const unsubscribe = onValue(ref(db, "notifications/" + currentUser.uid), (snapshot) => {
+      if (snapshot.exists()) {
         const data = snapshot.val();
-        if (data) {
-          const items = Object.entries(data)
-            .map(([id, notification]) => ({ id, ...notification }))
-            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          setNotifications(items);
-        } else {
-          setNotifications([]);
-        }
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching notifications:", err);
-        setError("Unable to load notifications. Please try again.");
-        setLoading(false);
+        const notifList = Object.entries(data)
+          .map(([id, notif]) => ({
+            id,
+            ...notif,
+            createdAt: notif.createdAt || Date.now()
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt);
+        setNotifications(notifList);
+      } else {
+        setNotifications([]);
       }
-    );
-
-    return () => {
-      unsubscribeNotifications();
-    };
-  }, [currentUser]);
-
-  async function handleMarkAsRead(notificationId, read) {
-    if (!currentUser || read) {
-      return;
-    }
-
-    try {
-      await update(
-        ref(db, "notifications/" + currentUser.uid + "/" + notificationId),
-        { read: true }
-      );
-      setNotifications((prev) =>
-        prev.map((item) =>
-          item.id === notificationId ? { ...item, read: true } : item
-        )
-      );
-    } catch (err) {
-      console.error("Error marking notification read:", err);
-      setError("Unable to update notification status.");
-    }
-  }
-
-  async function handleDeleteNotification(notificationId) {
-    if (!currentUser) {
-      return;
-    }
-
-    try {
-      await remove(ref(db, "notifications/" + currentUser.uid + "/" + notificationId));
-    } catch (err) {
-      console.error("Error deleting notification:", err);
-      setError("Unable to delete notification.");
-    }
-  }
-
-  async function handleMarkAllAsRead() {
-    if (!currentUser) {
-      return;
-    }
-
-    const updates = {};
-    notifications.forEach((notification) => {
-      if (!notification.read) {
-        updates[notification.id + "/read"] = true;
-      }
+      setLoading(false);
     });
 
-    if (Object.keys(updates).length === 0) {
-      return;
-    }
+    return () => unsubscribe();
+  }, [currentUser]);
 
+  const handleMarkRead = async (notificationId) => {
     try {
-      await update(ref(db, "notifications/" + currentUser.uid), updates);
-      setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
-    } catch (err) {
-      console.error("Error marking all notifications read:", err);
-      setError("Unable to mark all notifications as read.");
+      await update(ref(db, "notifications/" + currentUser.uid + "/" + notificationId), {
+        read: true
+      });
+    } catch (error) {
+      console.error(error);
     }
-  }
+  };
 
-  function getNotificationBorder(type) {
-    if (type === "success") return "border-l-4 border-green-500";
-    if (type === "alert") return "border-l-4 border-red-500";
-    return "border-l-4 border-blue-500";
-  }
+  const handleDelete = async (notificationId) => {
+    try {
+      await remove(ref(db, "notifications/" + currentUser.uid + "/" + notificationId));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 pb-24 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  const handleMarkAllRead = async () => {
+    try {
+      for (const notif of notifications) {
+        if (!notif.read) {
+          await update(ref(db, "notifications/" + currentUser.uid + "/" + notif.id), {
+            read: true
+          });
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return "now";
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "now";
+    if (minutes < 60) return minutes + " min ago";
+    if (hours < 24) return hours + " hr ago";
+    return days + " day ago";
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -129,70 +87,42 @@ export default function Notifications() {
             <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
             <p className="text-sm text-gray-500">Latest activity and updates</p>
           </div>
-          <button
-            onClick={handleMarkAllAsRead}
-            className="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-600"
-          >
-            Mark all read
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <Bell className="text-red-600" size={28} />
-          <p className="text-sm text-gray-500">Tap any notification to mark it read.</p>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+          <div className="flex items-center gap-2">
+            {notifications.length > 0 && <button onClick={handleMarkAllRead} className="text-xs text-red-600 font-semibold">Mark all read</button>}
+            <Bell className="text-red-600" size={28} />
           </div>
-        )}
+        </div>
 
-        {notifications.length === 0 ? (
-          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-            <p className="text-gray-500 font-medium">No notifications yet</p>
-            <p className="text-gray-400 text-sm mt-1">You will see updates here when activity happens.</p>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center">
+            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-600 font-semibold">No notifications yet</p>
+            <p className="text-gray-400 text-sm mt-1">You will see alerts here when donors respond or emergencies occur</p>
           </div>
         ) : (
           <div className="space-y-3">
             {notifications.map((notification) => {
-              const bgClass = notification.read ? "bg-white" : "bg-gray-100";
+              const borderClass = notification.type === "success" ? "border-l-4 border-green-500 bg-green-50" : notification.type === "alert" ? "border-l-4 border-red-500 bg-red-50" : "border-l-4 border-blue-500 bg-blue-50";
+              const unread = !notification.read;
+              
               return (
-                <div
-                  key={notification.id}
-                  className={"rounded-2xl p-4 shadow-sm " + getNotificationBorder(notification.type) + " " + bgClass}
-                  onClick={() => handleMarkAsRead(notification.id, notification.read)}
-                >
-                  <div className="flex items-start justify-between gap-3">
+                <div key={notification.id} onClick={() => handleMarkRead(notification.id)} className={`rounded-2xl p-4 shadow-sm cursor-pointer transition ${borderClass} ${unread ? "opacity-100" : "opacity-70"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm flex-shrink-0 ${notification.type === "success" ? "bg-green-100" : notification.type === "alert" ? "bg-red-100" : "bg-blue-100"}`}>
+                      <span className="text-lg">•</span>
+                    </div>
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">{notification.title || "Notification"}</p>
-                      <p className="text-gray-600 text-sm mt-1">{notification.message || ""}</p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        {notification.time || "Just now"}
-                      </p>
+                      <p className="font-semibold text-gray-900">{notification.title}</p>
+                      <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
+                      <p className="text-xs text-gray-400 mt-2">{formatTime(notification.createdAt)}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      {!notification.read && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleMarkAsRead(notification.id, notification.read);
-                          }}
-                          className="text-red-600 text-xs font-semibold"
-                        >
-                          Mark read
-                        </button>
-                      )}
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteNotification(notification.id);
-                        }}
-                        className="text-gray-500 text-xs font-semibold"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(notification.id); }} className="text-gray-400 hover:text-red-600 flex-shrink-0">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
               );
