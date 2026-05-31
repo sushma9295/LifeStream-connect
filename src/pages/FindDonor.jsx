@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Search, Phone, MapPin } from "lucide-react";
 import { db } from "../firebase/config";
 import { ref, onValue } from "firebase/database";
@@ -12,27 +11,29 @@ export default function FindDonor() {
   const [selectedGroup, setSelectedGroup] = useState("All");
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onValue(ref(db, "users"), (snapshot) => {
+      const donorList = [];
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const donorList = [];
         Object.entries(data).forEach(([userId, user]) => {
           if (user.isDonor === true || user.isDonor === "true") {
-            donorList.push({
-              id: userId,
-              name: user.name || "Anonymous Donor",
-              bloodGroup: user.bloodGroup || "Unknown",
-              city: user.city || "Unknown",
-              phone: user.phone || "N/A",
-              available: user.available === true || user.available === "true"
-            });
+            const available = user.available === true || user.available === "true";
+            if (available) {
+              donorList.push({
+                id: userId,
+                name: user.name || "Anonymous Donor",
+                bloodGroup: user.bloodGroup || "Unknown",
+                city: user.city || "Unknown",
+                phone: user.phone || "N/A",
+                available: available
+              });
+            }
           }
         });
-        setDonors(donorList);
       }
+      setDonors(donorList);
       setLoading(false);
     });
 
@@ -74,7 +75,7 @@ export default function FindDonor() {
             <div className="bg-white rounded-2xl p-8 text-center">
               <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-600 font-semibold">No donors found</p>
-              <p className="text-gray-400 text-sm mt-1">No donors registered yet. Sign up as a donor to help save lives!</p>
+              <p className="text-gray-400 text-sm mt-1">No donors are available in this area yet.</p>
             </div>
           ) : (
             <div className="space-y-3">

@@ -10,7 +10,6 @@ export default function Profile() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [available, setAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({});
@@ -24,7 +23,6 @@ export default function Profile() {
         if (snapshot.exists()) {
           const data = snapshot.val();
           setUserData(data);
-          setAvailable(data.available === true || data.available === "true");
           setEditData(data);
         }
       } catch (error) {
@@ -37,19 +35,8 @@ export default function Profile() {
     fetchUserData();
   }, [currentUser]);
 
-  async function toggleAvailable() {
-    if (!currentUser) return;
-    setLoading(true);
-    try {
-      const userRef = ref(db, "users/" + currentUser.uid);
-      await update(userRef, { available: !available });
-      setAvailable(!available);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const isDonor = userData?.isDonor === true || userData?.isDonor === "true";
+  const isAvailable = userData?.available === true || userData?.available === "true";
 
   async function handleSaveEdit() {
     if (!currentUser) return;
@@ -61,6 +48,20 @@ export default function Profile() {
     } catch (error) {
       console.error(error);
       alert("Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateUser(updates) {
+    if (!currentUser) return;
+    try {
+      setLoading(true);
+      await update(ref(db, "users/" + currentUser.uid), updates);
+      setUserData({ ...userData, ...updates });
+    } catch (error) {
+      console.error(error);
+      alert("Unable to update profile status.");
     } finally {
       setLoading(false);
     }
@@ -79,8 +80,6 @@ export default function Profile() {
     );
   }
 
-  const isDonor = userData?.isDonor === true || userData?.isDonor === "true";
-
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="px-4 pt-10 pb-4">
@@ -92,7 +91,7 @@ export default function Profile() {
             <div className="flex-1">
               <p className="text-sm text-red-200">Profile</p>
               <h1 className="text-2xl font-bold">{userData?.name || "User"}</h1>
-              {isDonor && <p className="text-xs text-green-200 font-semibold mt-1">Registered Donor</p>}
+              <p className="text-xs text-red-200 mt-1">{isDonor ? "Donor + Patient" : "Patient"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm text-red-100">
@@ -101,17 +100,46 @@ export default function Profile() {
           </div>
         </div>
 
-        {isDonor && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 mb-5 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700">
-              <Check size={18} />
-            </div>
+        <div className="bg-white rounded-3xl shadow-sm p-5 mb-5">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-sm font-semibold text-green-900">Donor Status</p>
-              <p className="text-xs text-green-700">You are registered as a blood donor</p>
+              <p className="text-sm font-semibold text-gray-900">Role</p>
+              <p className="text-xs text-gray-500">{isDonor ? "Donor + Patient" : "Patient"}</p>
             </div>
+            <span className={isDonor ? "px-3 py-1 rounded-full bg-green-600 text-white text-xs font-semibold" : "px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold"}>
+              {isDonor ? "Both" : "Patient"}
+            </span>
           </div>
-        )}
+
+          {!isDonor ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700">Become a donor anytime while keeping your ability to request blood.</p>
+              <button onClick={() => handleUpdateUser({ isDonor: true, available: true })} disabled={loading} className="w-full bg-red-600 text-white py-3 rounded-2xl font-semibold">
+                Become a Donor
+              </button>
+              <p className="text-xs text-gray-500">You are now registered as a donor! Other patients can find you when you are available.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
+                <p className="text-sm font-semibold text-green-900">Active Donor</p>
+                <p className="text-xs text-green-700">You remain visible to patients while your donor status is active.</p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Availability</p>
+                  <p className="text-xs text-gray-500">Toggle online or offline for donations</p>
+                </div>
+                <button onClick={() => handleUpdateUser({ available: !isAvailable })} disabled={loading} className={isAvailable ? "px-4 py-2 rounded-full bg-green-600 text-white text-sm font-semibold" : "px-4 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-semibold"}>
+                  {isAvailable ? "Online" : "Offline"}
+                </button>
+              </div>
+              <button onClick={() => handleUpdateUser({ isDonor: false, available: false })} disabled={loading} className="w-full bg-gray-100 text-gray-700 py-3 rounded-2xl font-semibold">
+                Stop being a donor
+              </button>
+            </div>
+          )}
+        </div>
 
         {editing ? (
           <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3 mb-5">
@@ -138,18 +166,6 @@ export default function Profile() {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-5">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Available to Donate</p>
-                  <p className="text-xs text-gray-500">Update your donation status</p>
-                </div>
-                <button onClick={toggleAvailable} disabled={loading} className={available ? "px-4 py-2 rounded-full bg-green-600 text-white font-semibold text-sm" : "px-4 py-2 rounded-full bg-gray-300 text-gray-700 font-semibold text-sm"}>
-                  {available ? "Active" : "Offline"}
-                </button>
-              </div>
-            </div>
-
             <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3 mb-5">
               <div className="flex items-center gap-3">
                 <Mail className="text-red-600" size={20} />

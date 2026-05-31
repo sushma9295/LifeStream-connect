@@ -15,11 +15,13 @@ export default function Signup() {
   const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [isDonor, setIsDonor] = useState(false);
+  const [role, setRole] = useState("patient");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
+
+  const isDonor = role === "donor";
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -71,29 +73,29 @@ export default function Signup() {
         <p className="text-red-200 text-sm mt-1">Join Lifestream Connect today</p>
       </div>
       <div className="flex-1 bg-white px-6 py-6 -mt-4 rounded-t-3xl">
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>}
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Full Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Email</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Phone Number</label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">City</label>
             <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Your city" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Blood Group</label>
             <select value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400">
@@ -101,33 +103,37 @@ export default function Signup() {
               {bloodGroups.map((group) => <option key={group} value={group}>{group}</option>)}
             </select>
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Password</label>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
+
           <div>
             <label className="text-xs font-semibold text-gray-700 mb-1 block">Confirm Password</label>
             <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm your password" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-          
-          <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-200 rounded-xl px-4 py-4 mt-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-bold text-gray-900">Register as a Donor</label>
-              <button type="button" onClick={() => setIsDonor(!isDonor)} className={isDonor ? "w-12 h-6 rounded-full bg-red-600 relative transition" : "w-12 h-6 rounded-full bg-gray-300 relative transition"}>
-                <span className={isDonor ? "absolute left-6 top-0.5 w-5 h-5 bg-white rounded-full shadow transition" : "absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition"} />
+
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-900">Choose your starting role</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setRole("patient")} className={role === "patient" ? "rounded-2xl border-2 border-red-600 bg-white p-4 text-left" : "rounded-2xl border border-gray-200 bg-white p-4 text-left"}>
+                <p className="font-semibold text-gray-900">I need blood</p>
+                <p className="text-xs text-gray-500 mt-1">Patient only. You can request blood now.</p>
+              </button>
+              <button type="button" onClick={() => setRole("donor")} className={role === "donor" ? "rounded-2xl border-2 border-red-600 bg-white p-4 text-left" : "rounded-2xl border border-gray-200 bg-white p-4 text-left"}>
+                <p className="font-semibold text-gray-900">I can donate blood</p>
+                <p className="text-xs text-gray-500 mt-1">Donor. You can still request blood later.</p>
               </button>
             </div>
-            {isDonor && <p className="text-xs text-red-700 font-semibold">You will appear as a donor to others in the Find Donor network</p>}
-            {!isDonor && <p className="text-xs text-gray-600">Toggle on to help save lives by becoming a registered donor</p>}
+            <p className="text-xs text-gray-600">You can always request blood even as a donor. Your donor status does not affect your ability to request blood for yourself.</p>
           </div>
-          
-          <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md disabled:opacity-60 flex items-center justify-center gap-2 mt-4">
-            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Create Account"}
+
+          <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md disabled:opacity-60">
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
-        
+
         <p className="text-center text-gray-500 text-sm mt-4">Already have an account? <Link to="/login" className="text-red-600 font-semibold">Login</Link></p>
       </div>
     </div>

@@ -1,286 +1,148 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { ArrowLeft, Droplets } from "lucide-react";
 import { db } from "../firebase/config";
-import { ref, push, get } from "firebase/database";
-import { ArrowLeft, Droplets, CheckCircle } from "lucide-react";
+import { ref, push, set, get } from "firebase/database";
+import { useAuth } from "../context/AuthContext";
 import BottomNav from "../components/BottomNav";
-
-const isDonorUser = (user) =>
-  user &&
-  (user.isDonor === true ||
-    user.isDonor === "true" ||
-    user.isDonor === 1 ||
-    user.isDonor === "1");
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function RequestBlood() {
-  const [form, setForm] = useState({
-    patientName: "",
-    bloodGroup: "",
-    hospital: "",
-    city: "",
-    units: "1",
-    contact: "",
-    notes: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [patientName, setPatientName] = useState("");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [hospital, setHospital] = useState("");
+  const [city, setCity] = useState("");
+  const [units, setUnits] = useState("1");
+  const [contact, setContact] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [isDonor, setIsDonor] = useState(false);
 
-  function handle(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
+  useEffect(() => {
+    if (!currentUser) return;
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const { patientName, bloodGroup, hospital, city, units, contact } = form;
-    if (!currentUser) {
-      setError("Please log in to submit a request.");
+    const fetchProfile = async () => {
+      try {
+        const snapshot = await get(ref(db, "users/" + currentUser.uid));
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          setIsDonor(data.isDonor === true || data.isDonor === "true");
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchProfile();
+  }, [currentUser]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!patientName || !bloodGroup || !hospital || !city || !units || !contact) {
       return;
     }
-    if (!patientName || !bloodGroup || !hospital || !city || !contact) {
-      setError("Please fill all required fields.");
-      return;
-    }
+    setLoading(true);
     try {
-      setError("");
-      setLoading(true);
-      await push(ref(db, "requests"), {
+      const requestRef = push(ref(db, "requests"));
+      await set(requestRef, {
         patientName,
         bloodGroup,
         hospital,
         city,
-        units,
+        units: Number(units),
         contact,
-        notes: form.notes,
-        userId: currentUser.uid,
+        notes,
+        userId: currentUser?.uid,
         status: "pending",
         createdAt: Date.now(),
       });
-      await notifyMatchingDonors(bloodGroup, hospital, city, units);
       setSuccess(true);
-      setForm({
-        patientName: "",
-        bloodGroup: "",
-        hospital: "",
-        city: "",
-        units: "1",
-        contact: "",
-        notes: "",
-      });
-      setTimeout(() => setSuccess(false), 4000);
-    } catch {
-      setError("Failed to submit request. Please try again.");
+      setPatientName("");
+      setBloodGroup("");
+      setHospital("");
+      setCity("");
+      setUnits("1");
+      setContact("");
+      setNotes("");
+      setTimeout(() => {
+        setSuccess(false);
+        navigate("/my-requests");
+      }, 2000);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   }
 
-  async function notifyMatchingDonors(bloodGroup, hospital, city, units) {
-    try {
-      const usersSnapshot = await get(ref(db, "users"));
-      const usersData = usersSnapshot.val();
-      if (!usersData) {
-        return;
-      }
-      const matchingDonorIds = Object.entries(usersData)
-        .filter(
-          ([, user]) =>
-            isDonorUser(user) &&
-            (user.available === true ||
-              user.available === "true" ||
-              user.available === 1 ||
-              user.available === "1") &&
-            user.bloodGroup === bloodGroup
-        )
-        .map(([donorId]) => donorId);
-
-      await Promise.all(
-        matchingDonorIds.map((donorId) =>
-          push(ref(db, `notifications/${donorId}`), {
-            type: "request",
-            title: "New Blood Request",
-            message: `Need ${units} unit(s) of ${bloodGroup} at ${hospital} in ${city}`,
-            read: false,
-            createdAt: Date.now(),
-          })
-        )
-      );
-    } catch (err) {
-      console.error("Request notification error:", err);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 pt-12 pb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-white mb-4 flex items-center gap-1"
-        >
-          <ArrowLeft size={20} />
-          <span className="text-sm">Back</span>
+      <div className="px-4 pt-10 pb-4">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-700 mb-4">
+          <ArrowLeft size={20} /> Back
         </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-            <Droplets className="text-red-600" size={22} />
-          </div>
-          <div>
-            <h1 className="text-white text-xl font-bold">Request Blood</h1>
-            <p className="text-red-200 text-xs">Fill in patient details below</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 py-6 space-y-4">
-        {/* Success Banner */}
-        {success && (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3">
-            <CheckCircle className="text-green-500" size={22} />
+        <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-3xl p-5 text-white shadow-lg">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+              <Droplets size={20} />
+            </div>
             <div>
-              <p className="text-green-700 font-semibold text-sm">Request Submitted!</p>
-              <p className="text-green-600 text-xs">We are finding donors for you.</p>
+              <p className="text-sm text-red-200">Request blood for patients fast</p>
+              <h1 className="text-xl font-bold">Create Request</h1>
             </div>
           </div>
-        )}
-
-        {/* Error Banner */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
-            <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      </div>
+      <div className="px-4 space-y-4">
+        {isDonor && (
+          <div className="bg-blue-50 border border-blue-100 rounded-3xl p-4 text-blue-900 space-y-2">
+            <p className="text-sm font-semibold">You are requesting as a patient</p>
+            <p className="text-xs">Your donor status remains active.</p>
+            <p className="text-xs">Other donors can still see you as available.</p>
           </div>
         )}
-
-        {/* Form */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
+        {success && <div className="bg-green-50 border border-green-200 text-green-700 rounded-2xl px-4 py-3">Request submitted successfully!</div>}
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Patient Name *
-            </label>
-            <input
-              name="patientName"
-              type="text"
-              value={form.patientName}
-              onChange={handle}
-              placeholder="Enter patient name"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            />
+            <label className="text-sm font-semibold text-gray-700">Patient Name</label>
+            <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Enter patient name" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Blood Group *
-            </label>
-            <select
-              name="bloodGroup"
-              value={form.bloodGroup}
-              onChange={handle}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            >
-              <option value="">Select Blood Group</option>
-              {bloodGroups.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
+            <label className="text-sm font-semibold text-gray-700">Blood Group</label>
+            <select value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400">
+              <option value="">Select blood group</option>
+              {bloodGroups.map((group) => <option key={group} value={group}>{group}</option>)}
             </select>
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Hospital Name *
-            </label>
-            <input
-              name="hospital"
-              type="text"
-              value={form.hospital}
-              onChange={handle}
-              placeholder="e.g. Apollo Hospital"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            />
+            <label className="text-sm font-semibold text-gray-700">Hospital</label>
+            <input type="text" value={hospital} onChange={(e) => setHospital(e.target.value)} placeholder="Hospital name" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              City *
-            </label>
-            <input
-              name="city"
-              type="text"
-              value={form.city}
-              onChange={handle}
-              placeholder="e.g. Chennai"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            />
+            <label className="text-sm font-semibold text-gray-700">City</label>
+            <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Units Required *
-            </label>
-            <input
-              name="units"
-              type="number"
-              value={form.units}
-              onChange={handle}
-              min="1"
-              max="10"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            />
+            <label className="text-sm font-semibold text-gray-700">Units</label>
+            <input type="number" value={units} onChange={(e) => setUnits(e.target.value)} min="1" max="10" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Contact Number *
-            </label>
-            <input
-              name="contact"
-              type="tel"
-              value={form.contact}
-              onChange={handle}
-              placeholder="Enter contact number"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50"
-            />
+            <label className="text-sm font-semibold text-gray-700">Contact Number</label>
+            <input type="tel" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Phone number" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400" />
           </div>
-
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Additional Notes
-            </label>
-            <textarea
-              name="notes"
-              value={form.notes}
-              onChange={handle}
-              rows={3}
-              placeholder="Any additional information..."
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-gray-50 resize-none"
-            />
+            <label className="text-sm font-semibold text-gray-700">Notes</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" placeholder="Additional details" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-red-400 resize-none" />
           </div>
-        </div>
-
-        {/* Submit Button */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-4 rounded-2xl shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Submitting...
-            </>
-          ) : (
-            <>
-              <Droplets size={20} />
-              Submit Request
-            </>
-          )}
-        </button>
+          <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md disabled:opacity-60 flex items-center justify-center gap-2">
+            {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Broadcast Request"}
+          </button>
+        </form>
       </div>
-
       <BottomNav />
     </div>
   );
