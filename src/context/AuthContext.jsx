@@ -1,13 +1,6 @@
 ﻿import { createContext, useContext, useState, useEffect } from "react";
 import { auth } from "../firebase/config";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  updateProfile as firebaseUpdateProfile,
-  sendPasswordResetEmail,
-} from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
 const AuthContext = createContext(null);
 
@@ -31,17 +24,6 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  function updateProfile(data) {
-    if (!auth.currentUser) {
-      return Promise.reject(new Error("No authenticated user"));
-    }
-    return firebaseUpdateProfile(auth.currentUser, data);
-  }
-
-  function resetPassword(email) {
-    return sendPasswordResetEmail(auth, email);
-  }
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -55,8 +37,6 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    updateProfile,
-    resetPassword,
     loading,
   };
 

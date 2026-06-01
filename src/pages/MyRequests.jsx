@@ -94,13 +94,13 @@ export default function MyRequests() {
                   <span>{new Date(request.createdAt).toLocaleDateString()}</span>
                 </div>
                 {activeTab === "patient" && request.status === "accepted" && (
-                  <button onClick={() => navigate("/live-tracking")} className="mt-4 w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
+                  <button onClick={() => navigate("/live-tracking", { state: { requestId: request.id } })} className="mt-4 w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
                     <ChevronRight size={18} /> Track
                   </button>
                 )}
                 {activeTab === "donor" && request.status === "accepted" && (
                   <div className="mt-4 space-y-3">
-                    <button onClick={() => navigate("/live-tracking")} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
+                    <button onClick={() => navigate("/donor-tracking", { state: { requestId: request.id } })} className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
                       Navigate to Hospital
                     </button>
                     <button onClick={() => handleComplete(request.id)} className="w-full bg-gray-100 text-gray-700 font-semibold py-3 rounded-xl">
