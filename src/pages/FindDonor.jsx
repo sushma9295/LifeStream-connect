@@ -1,108 +1,158 @@
-import { useState, useEffect } from "react";
-import { Search, Phone, MapPin } from "lucide-react";
-import { db } from "../firebase/config";
-import { ref, onValue } from "firebase/database";
-import BottomNav from "../components/BottomNav";
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import { db } from "../firebase/config"
+import { ref, onValue } from "firebase/database"
+import { Search, MapPin, Phone, User } from "lucide-react"
+import BottomNav from "../components/BottomNav"
 
-const bloodGroups = ["All", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const bloodGroups = ["All", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 
 export default function FindDonor() {
-  const [searchCity, setSearchCity] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("All");
-  const [donors, setDonors] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [searchCity, setSearchCity] = useState("")
+  const [selectedGroup, setSelectedGroup] = useState("All")
+  const [donors, setDonors] = useState([])
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(db, "users"), (snapshot) => {
-      const donorList = [];
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        Object.entries(data).forEach(([userId, user]) => {
-          if (user.isDonor === true || user.isDonor === "true") {
-            const available = user.available === true || user.available === "true";
-            if (available) {
-              donorList.push({
-                id: userId,
-                name: user.name || "Anonymous Donor",
-                bloodGroup: user.bloodGroup || "Unknown",
-                city: user.city || "Unknown",
-                phone: user.phone || "N/A",
-                available: available
-              });
-            }
-          }
-        });
+    const usersRef = ref(db, "users")
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        const donorList = Object.entries(data)
+          .map(([id, user]) => ({ id, ...user }))
+          .filter((u) => u.isDonor === true)
+        setDonors(donorList)
+      } else {
+        setDonors([])
       }
-      setDonors(donorList);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [])
 
   const filteredDonors = donors.filter((donor) => {
-    const matchesGroup = selectedGroup === "All" || donor.bloodGroup === selectedGroup;
-    const matchesCity = donor.city.toLowerCase().includes(searchCity.toLowerCase());
-    return matchesGroup && matchesCity;
-  });
+    const matchGroup =
+      selectedGroup === "All" || donor.bloodGroup === selectedGroup
+    const matchCity =
+      searchCity === "" ||
+      (donor.city &&
+        donor.city.toLowerCase().includes(searchCity.toLowerCase()))
+    return matchGroup && matchCity
+  })
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-gradient-to-br from-red-600 to-red-800 px-6 pt-12 pb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <MapPin className="text-white/80" size={20} />
-          <h1 className="text-white text-xl font-bold">Find Donor</h1>
-        </div>
-        <div className="mt-4 bg-white rounded-xl px-3 py-2 flex items-center gap-2">
-          <Search className="text-gray-400" size={18} />
-          <input value={searchCity} onChange={(e) => setSearchCity(e.target.value)} placeholder="Search by city" className="w-full text-sm focus:outline-none" />
-        </div>
+      <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 pt-12 pb-6">
+        <h1 className="text-white text-xl font-bold mb-1">Find Donor</h1>
+        <p className="text-red-200 text-xs">Search nearby blood donors</p>
       </div>
-      <div className="px-4 py-4">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {bloodGroups.map((group) => (
-            <button key={group} onClick={() => setSelectedGroup(group)} className={selectedGroup === group ? "px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-semibold" : "px-3 py-1.5 rounded-full bg-white text-gray-600 text-xs font-semibold border border-gray-200"}>
-              {group}
+
+      <div className="px-4 py-4 space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={searchCity}
+            onChange={(e) => setSearchCity(e.target.value)}
+            placeholder="Search by city..."
+            className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-red-400 bg-white shadow-sm"
+          />
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {bloodGroups.map((g) => (
+            <button
+              key={g}
+              onClick={() => setSelectedGroup(g)}
+              className={
+                "flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition-all " +
+                (selectedGroup === g
+                  ? "bg-red-600 text-white border-red-600"
+                  : "bg-white text-gray-600 border-gray-200")
+              }
+            >
+              {g}
             </button>
           ))}
         </div>
-        <div className="mt-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
-            </div>
-          ) : filteredDonors.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center">
-              <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600 font-semibold">No donors found</p>
-              <p className="text-gray-400 text-sm mt-1">No donors are available in this area yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredDonors.map((donor) => (
-                <div key={donor.id} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <span className="text-red-700 font-bold text-sm">{donor.bloodGroup}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-gray-900 font-semibold text-sm">{donor.name}</p>
-                    <p className="text-gray-500 text-xs mt-1">{donor.city}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <div className={donor.available ? "text-green-600 text-xs font-semibold" : "text-gray-400 text-xs font-semibold"}>
+
+        <p className="text-xs text-gray-500 font-medium">
+          {filteredDonors.length} donor{filteredDonors.length !== 1 ? "s" : ""} found
+        </p>
+
+        {loading && (
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+
+        {!loading && filteredDonors.length === 0 && (
+          <div className="text-center py-12">
+            <User className="mx-auto text-gray-300 mb-3" size={48} />
+            <p className="text-gray-500 font-medium">No donors found</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {searchCity || selectedGroup !== "All"
+                ? "Try different filters"
+                : "No donors registered yet. Sign up as a donor!"}
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {!loading &&
+            filteredDonors.map((donor) => (
+              <div
+                key={donor.id}
+                className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3"
+              >
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-600 font-bold text-sm">
+                    {donor.bloodGroup}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-gray-800 text-sm truncate">
+                      {donor.name}
+                    </p>
+                    <span
+                      className={
+                        "flex items-center gap-1 text-xs font-medium " +
+                        (donor.available ? "text-green-600" : "text-gray-400")
+                      }
+                    >
+                      <span
+                        className={
+                          "w-2 h-2 rounded-full " +
+                          (donor.available ? "bg-green-500" : "bg-gray-300")
+                        }
+                      ></span>
                       {donor.available ? "Available" : "Unavailable"}
-                    </div>
-                    <a href={"tel:" + donor.phone} className="bg-red-600 text-white text-xs px-3 py-1 rounded-xl flex items-center gap-1 no-underline">
-                      <Phone size={12} /> Call
-                    </a>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="flex items-center gap-1 text-xs text-gray-500">
+                      <MapPin size={12} />
+                      {donor.city || "Location not set"}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                {donor.available && donor.phone && (
+                  
+                    href={"tel:" + donor.phone}
+                    className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-xl px-3 py-2 text-xs font-semibold flex-shrink-0"
+                  >
+                    <Phone size={14} />
+                    Call
+                  </a>
+                )}
+              </div>
+            ))}
         </div>
       </div>
+
       <BottomNav />
     </div>
-  );
+  )
 }

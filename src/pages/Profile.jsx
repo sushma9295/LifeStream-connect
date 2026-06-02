@@ -1,213 +1,316 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { User, Phone, Mail, MapPin, Droplets, LogOut, Edit, Check, X } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import { db } from "../firebase/config";
-import { ref, get, update } from "firebase/database";
-import BottomNav from "../components/BottomNav";
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
+import { db } from "../firebase/config"
+import { ref, onValue, update } from "firebase/database"
+import { User, Phone, Mail, MapPin, Droplets, LogOut, Edit, Check, X } from "lucide-react"
+import BottomNav from "../components/BottomNav"
+
+const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
 
 export default function Profile() {
-  const { currentUser, logout } = useAuth();
-  const navigate = useNavigate();
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({});
+  const [userProfile, setUserProfile] = useState(null)
+  const [available, setAvailable] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: "", phone: "", city: "", bloodGroup: ""
+  })
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState("")
+  const { currentUser, logout } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
-    if (!currentUser) return;
-
-    const fetchUserData = async () => {
-      try {
-        const snapshot = await get(ref(db, "users/" + currentUser.uid));
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          setUserData(data);
-          setEditData(data);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+    if (!currentUser) return
+    const userRef = ref(db, "users/" + currentUser.uid)
+    const unsubscribe = onValue(userRef, (snapshot) => {
+      const data = snapshot.val()
+      if (data) {
+        setUserProfile(data)
+        setAvailable(data.available || false)
+        setEditForm({
+          name: data.name || "",
+          phone: data.phone || "",
+          city: data.city || "",
+          bloodGroup: data.bloodGroup || ""
+        })
       }
-    };
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [currentUser])
 
-    fetchUserData();
-  }, [currentUser]);
-
-  const isDonor = userData?.isDonor === true || userData?.isDonor === "true";
-  const isAvailable = userData?.available === true || userData?.available === "true";
-
-  async function handleSaveEdit() {
-    if (!currentUser) return;
+  async function handleSaveProfile() {
+    if (!editForm.name || !editForm.phone || !editForm.city || !editForm.bloodGroup) {
+      return
+    }
     try {
-      setLoading(true);
-      await update(ref(db, "users/" + currentUser.uid), editData);
-      setUserData(editData);
-      setEditing(false);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to update profile");
+      setSaving(true)
+      await update(ref(db, "users/" + currentUser.uid), {
+        name: editForm.name,
+        phone: editForm.phone,
+        city: editForm.city,
+        bloodGroup: editForm.bloodGroup,
+        updatedAt: Date.now()
+      })
+      setIsEditing(false)
+      setSuccess("Profile updated successfully!")
+      setTimeout(() => setSuccess(""), 3000)
+    } catch (err) {
+      console.log("Save error:", err)
     } finally {
-      setLoading(false);
+      setSaving(false)
     }
   }
 
-  async function handleUpdateUser(updates) {
-    if (!currentUser) return;
-    try {
-      setLoading(true);
-      await update(ref(db, "users/" + currentUser.uid), updates);
-      setUserData({ ...userData, ...updates });
-    } catch (error) {
-      console.error(error);
-      alert("Unable to update profile status.");
-    } finally {
-      setLoading(false);
-    }
+  async function toggleAvailable() {
+    const newValue = !available
+    setAvailable(newValue)
+    await update(ref(db, "users/" + currentUser.uid), {
+      available: newValue
+    })
+  }
+
+  async function becomeDonor() {
+    await update(ref(db, "users/" + currentUser.uid), {
+      isDonor: true,
+      available: true
+    })
+    setSuccess("You are now registered as a donor!")
+    setTimeout(() => setSuccess(""), 3000)
   }
 
   async function handleLogout() {
-    await logout();
-    navigate("/login");
+    try {
+      await logout()
+      navigate("/login")
+    } catch (err) {
+      console.log("Logout error:", err)
+    }
   }
 
-  if (loading && !userData) {
+  function getInitials() {
+    if (userProfile && userProfile.name) {
+      return userProfile.name.charAt(0).toUpperCase()
+    }
+    if (currentUser && currentUser.email) {
+      return currentUser.email.charAt(0).toUpperCase()
+    }
+    return "U"
+  }
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 pb-24 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-red-200 border-t-red-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="px-4 pt-10 pb-4">
-        <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-3xl p-6 text-white shadow-lg mb-5">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-white text-2xl font-bold">
-              <User size={28} />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-red-200">Profile</p>
-              <h1 className="text-2xl font-bold">{userData?.name || "User"}</h1>
-              <p className="text-xs text-red-200 mt-1">{isDonor ? "Donor + Patient" : "Patient"}</p>
-            </div>
+      <div className="bg-gradient-to-br from-red-600 to-red-800 px-4 pt-12 pb-8">
+        <div className="flex flex-col items-center">
+          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg mb-3">
+            <span className="text-red-600 font-bold text-2xl">{getInitials()}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-red-100">
-            <Droplets size={16} />
-            <span>{userData?.bloodGroup || "Unknown"} Blood Group</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl shadow-sm p-5 mb-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">Role</p>
-              <p className="text-xs text-gray-500">{isDonor ? "Donor + Patient" : "Patient"}</p>
-            </div>
-            <span className={isDonor ? "px-3 py-1 rounded-full bg-green-600 text-white text-xs font-semibold" : "px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-xs font-semibold"}>
-              {isDonor ? "Both" : "Patient"}
+          <h2 className="text-white font-bold text-xl">
+            {userProfile ? userProfile.name : currentUser.email.split("@")[0]}
+          </h2>
+          {userProfile && userProfile.bloodGroup && (
+            <span className="bg-white text-red-600 text-xs font-bold px-3 py-1 rounded-full mt-2">
+              {userProfile.bloodGroup}
             </span>
-          </div>
-
-          {!isDonor ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-700">Become a donor anytime while keeping your ability to request blood.</p>
-              <button onClick={() => handleUpdateUser({ isDonor: true, available: true })} disabled={loading} className="w-full bg-red-600 text-white py-3 rounded-2xl font-semibold">
-                Become a Donor
-              </button>
-              <p className="text-xs text-gray-500">You are now registered as a donor! Other patients can find you when you are available.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-green-50 border border-green-100 rounded-2xl p-4">
-                <p className="text-sm font-semibold text-green-900">Active Donor</p>
-                <p className="text-xs text-green-700">You remain visible to patients while your donor status is active.</p>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Availability</p>
-                  <p className="text-xs text-gray-500">Toggle online or offline for donations</p>
-                </div>
-                <button onClick={() => handleUpdateUser({ available: !isAvailable })} disabled={loading} className={isAvailable ? "px-4 py-2 rounded-full bg-green-600 text-white text-sm font-semibold" : "px-4 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-semibold"}>
-                  {isAvailable ? "Online" : "Offline"}
-                </button>
-              </div>
-              <button onClick={() => handleUpdateUser({ isDonor: false, available: false })} disabled={loading} className="w-full bg-gray-100 text-gray-700 py-3 rounded-2xl font-semibold">
-                Stop being a donor
-              </button>
-            </div>
           )}
-        </div>
-
-        {editing ? (
-          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3 mb-5">
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Full Name</label>
-              <input type="text" value={editData.name || ""} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-400" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">Phone</label>
-              <input type="tel" value={editData.phone || ""} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-400" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1">City</label>
-              <input type="text" value={editData.city || ""} onChange={(e) => setEditData({ ...editData, city: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-400" />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button onClick={handleSaveEdit} disabled={loading} className="flex-1 bg-red-600 text-white font-semibold py-2 rounded-xl flex items-center justify-center gap-2">
-                <Check size={16} /> Save
-              </button>
-              <button onClick={() => setEditing(false)} className="flex-1 bg-gray-200 text-gray-700 font-semibold py-2 rounded-xl flex items-center justify-center gap-2">
-                <X size={16} /> Cancel
-              </button>
-            </div>
+          {userProfile && userProfile.city && (
+            <p className="text-red-200 text-xs mt-1">{userProfile.city}</p>
+          )}
+          <div className="flex gap-2 mt-2">
+            {userProfile && userProfile.isDonor && (
+              <span className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                Active Donor
+              </span>
+            )}
           </div>
-        ) : (
-          <>
-            <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3 mb-5">
-              <div className="flex items-center gap-3">
-                <Mail className="text-red-600" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm text-gray-900">{currentUser?.email || "Not set"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="text-red-600" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500">Phone</p>
-                  <p className="text-sm text-gray-900">{userData?.phone || "Not set"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Droplets className="text-red-600" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500">Blood Group</p>
-                  <p className="text-sm text-gray-900">{userData?.bloodGroup || "Not set"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="text-red-600" size={20} />
-                <div>
-                  <p className="text-xs text-gray-500">City</p>
-                  <p className="text-sm text-gray-900">{userData?.city || "Not set"}</p>
-                </div>
-              </div>
-            </div>
+        </div>
+      </div>
 
-            <button onClick={() => setEditing(true)} className="w-full bg-white border border-red-200 text-red-600 font-semibold py-3 rounded-xl mb-3 flex items-center justify-center gap-2">
-              <Edit size={18} /> Edit Profile
-            </button>
-          </>
+      <div className="px-4 py-4 space-y-4">
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3">
+            <p className="text-green-700 text-sm text-center font-medium">{success}</p>
+          </div>
         )}
 
-        <button onClick={handleLogout} className="w-full bg-red-50 text-red-600 border border-red-200 font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
-          <LogOut size={18} /> Logout
+        {isEditing ? (
+          <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-semibold text-gray-800">Edit Profile</p>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="text-gray-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Full Name</label>
+              <input
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Phone</label>
+              <input
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">City</label>
+              <input
+                value={editForm.city}
+                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Blood Group</label>
+              <select
+                value={editForm.bloodGroup}
+                onChange={(e) => setEditForm({ ...editForm, bloodGroup: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-400"
+              >
+                <option value="">Select Blood Group</option>
+                {bloodGroups.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleSaveProfile}
+              disabled={saving}
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <Check size={18} />
+                  Save Changes
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-semibold text-gray-800 text-sm">My Information</p>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 text-red-600 text-xs font-medium"
+              >
+                <Edit size={14} />
+                Edit
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Mail className="text-gray-400 flex-shrink-0" size={16} />
+                <div>
+                  <p className="text-xs text-gray-400">Email</p>
+                  <p className="text-sm text-gray-700">{currentUser.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Phone className="text-gray-400 flex-shrink-0" size={16} />
+                <div>
+                  <p className="text-xs text-gray-400">Phone</p>
+                  <p className="text-sm text-gray-700">
+                    {userProfile && userProfile.phone ? userProfile.phone : "Not set"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Droplets className="text-gray-400 flex-shrink-0" size={16} />
+                <div>
+                  <p className="text-xs text-gray-400">Blood Group</p>
+                  <p className="text-sm text-gray-700">
+                    {userProfile && userProfile.bloodGroup ? userProfile.bloodGroup : "Not set"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <MapPin className="text-gray-400 flex-shrink-0" size={16} />
+                <div>
+                  <p className="text-xs text-gray-400">City</p>
+                  <p className="text-sm text-gray-700">
+                    {userProfile && userProfile.city ? userProfile.city : "Not set"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {userProfile && userProfile.isDonor && (
+          <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">Available to Donate</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {available ? "You appear in donor search" : "You are hidden from search"}
+                </p>
+              </div>
+              <button
+                onClick={toggleAvailable}
+                className={
+                  "w-12 h-6 rounded-full transition-colors relative " +
+                  (available ? "bg-red-500" : "bg-gray-300")
+                }
+              >
+                <span
+                  className={
+                    "absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform " +
+                    (available ? "translate-x-7" : "translate-x-1")
+                  }
+                ></span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {userProfile && !userProfile.isDonor && (
+          <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
+            <p className="font-semibold text-gray-800 text-sm mb-1">
+              Become a Donor
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              Register as a donor to help save lives. You can still request blood anytime.
+            </p>
+            <button
+              onClick={becomeDonor}
+              className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-2.5 rounded-xl text-sm"
+            >
+              Register as Donor
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={handleLogout}
+          className="w-full bg-red-50 text-red-600 border border-red-200 rounded-xl py-3 font-semibold flex items-center justify-center gap-2"
+        >
+          <LogOut size={18} />
+          Logout
         </button>
       </div>
+
       <BottomNav />
     </div>
-  );
+  )
 }
