@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebase/config";
 import { Mail, ArrowLeft, CheckCircle, Droplets } from "lucide-react";
@@ -9,7 +9,6 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   async function handleReset(e) {
     if (e && e.preventDefault) e.preventDefault();
@@ -42,28 +41,24 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <div className="bg-gradient-to-br from-red-600 to-red-800 min-h-[220px] flex flex-col items-center justify-center py-12 px-6">
-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg mb-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-br from-red-600 to-red-800 flex flex-col items-center justify-center py-14 px-6">
+        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
           <Droplets className="text-red-600" size={32} />
         </div>
-        <h1 className="text-white text-2xl font-bold">Forgot Password</h1>
+        <h1 className="text-white text-2xl font-bold mt-3">Forgot Password</h1>
         <p className="text-red-200 text-sm mt-1">Reset your password via email</p>
       </div>
 
       {!success ? (
-        <div className="flex-1 bg-gray-50 px-6 py-8 rounded-t-3xl -mt-4">
-          <Link
-            to="/login"
-            onClick={() => navigate("/login")}
-            className="flex items-center gap-1 text-gray-500 text-sm mb-6"
-          >
+        <div className="flex-1 bg-gray-50 px-6 py-8 rounded-t-3xl -mt-6">
+          <Link to="/login" className="flex items-center gap-1 text-gray-500 text-sm mb-6">
             <ArrowLeft size={16} />
             Back to Login
           </Link>
 
           <h2 className="text-xl font-bold text-gray-800 mb-1">Reset Password</h2>
-          <p className="text-sm text-gray-500 mb-6">Enter your registered email. We will send you a reset link.</p>
+          <p className="text-sm text-gray-500 mb-6">Enter your registered email address. We will send you a password reset link.</p>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">
@@ -103,40 +98,44 @@ export default function ForgotPassword() {
               </>
             )}
           </button>
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Remember your password? <Link to="/login" className="text-red-600 font-semibold">Login</Link>
+          </p>
         </div>
       ) : (
-        <div className="flex-1 bg-gray-50 px-6 py-8 rounded-t-3xl -mt-4 flex flex-col items-center">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 mt-8">
-            <CheckCircle className="text-green-500" size={44} />
+        <div className="flex-1 px-6 py-8 flex flex-col items-center rounded-t-3xl bg-gray-50 -mt-6">
+          <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 mt-4">
+            <CheckCircle className="text-green-500" size={48} />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Email Sent!</h2>
-          <p className="text-sm text-gray-500 text-center">Password reset link has been sent to</p>
+          <p className="text-sm text-gray-500 text-center">Password reset link sent to</p>
           <p className="text-red-600 font-semibold text-sm mt-1 mb-6 text-center">{email}</p>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm text-left w-full mb-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Next Steps</h3>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Next Steps</p>
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-xs">✓</span>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
                 </div>
                 <span className="text-sm text-gray-600">Check your email inbox</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-xs">✓</span>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
                 </div>
                 <span className="text-sm text-gray-600">Click the reset link in the email</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-xs">✓</span>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
                 </div>
                 <span className="text-sm text-gray-600">Create your new password</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-xs">✓</span>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-green-600 text-xs font-bold">✓</span>
                 </div>
                 <span className="text-sm text-gray-600">Come back and login</span>
               </div>
@@ -149,13 +148,13 @@ export default function ForgotPassword() {
             disabled={loading}
             className="w-full border-2 border-red-600 text-red-600 font-semibold py-3 rounded-xl mb-3 flex items-center justify-center gap-2"
           >
+            <Mail size={16} />
             Resend Email
           </button>
 
           <Link
             to="/login"
-            onClick={() => navigate("/login")}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md flex items-center justify-center text-center"
+            className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md flex items-center justify-center"
           >
             Back to Login
           </Link>
