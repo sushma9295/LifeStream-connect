@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import SplashScreen from "./pages/SplashScreen";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import RequestBlood from "./pages/RequestBlood";
 import EmergencyRequest from "./pages/EmergencyRequest";
@@ -24,6 +25,7 @@ export default function App() {
               <Route path="/" element={<SplashScreen />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/request-blood" element={<ProtectedRoute><RequestBlood /></ProtectedRoute>} />
               <Route path="/emergency" element={<ProtectedRoute><EmergencyRequest /></ProtectedRoute>} />

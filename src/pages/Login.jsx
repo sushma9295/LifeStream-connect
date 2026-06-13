@@ -55,6 +55,14 @@ export default function Login() {
               </button>
             </div>
           </div>
+          <div className="flex justify-end mb-4">
+            <Link
+              to="/forgot-password"
+              className="text-red-600 text-sm font-medium hover:text-red-700"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 rounded-xl shadow-md disabled:opacity-60 flex items-center justify-center gap-2">
             {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Login"}
           </button>
